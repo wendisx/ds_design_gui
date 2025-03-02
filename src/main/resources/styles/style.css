@@ -1,0 +1,28 @@
+/* styles/style.css */
+
+/* 导航栏样式 */
+.vbox {
+    -fx-background-color: #2C3E50;
+    -fx-padding: 10;
+}
+
+/* 按钮样式 */
+.button {
+    -fx-background-color: #27AE60;
+    -fx-text-fill: white;
+    -fx-padding: 10px;
+    -fx-font-size: 14px;
+    -fx-alignment: center; /* 文本居中 */
+}
+
+.button:hover {
+    -fx-background-color: #2ECC71;
+}
+
+/* 右侧内容区域样式 */
+#contentArea {
+    -fx-padding: 20;
+    -fx-font-size: 48px; /* 增大字体 */
+    -fx-font-weight: bold;
+    -fx-alignment: center; /* 内容居中 */
+}
