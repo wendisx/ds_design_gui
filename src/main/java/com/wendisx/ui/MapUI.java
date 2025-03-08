@@ -211,7 +211,7 @@ public class MapUI {
             }
             //System.out.println(Graph.getShortestPathLength());
             drawMultiSourceShortestPath(shortestPath);
-            commonUI.showShortestPathDialog(shortestPath,Graph.getShortestPathLength());
+            commonUI.showShortestPathDialog(shortestPath,Graph.getShortestPathLength(),1);
             commonUI.createInformationAlert("提示", null, "最短路径查找成功！").showAndWait();
         }else{
             commonUI.createWarningAlert("提示", null, "编号不合法！").showAndWait();
@@ -245,8 +245,9 @@ public class MapUI {
     private void VisiteAllHandle(String beginNumber){
         if(checkNumber(beginNumber)){
             // TODO: 得到合法起始编号，调用最短路径算法计算遍历得到最短路径
-            List<Edge> visiteShortestPath = Graph.findShortestTravelPath(beginNumber);
+            List<Edge> visiteShortestPath = Graph.findMiniVisiteAllNodePath(beginNumber);
             drawShortestPath(visiteShortestPath);
+            commonUI.showShortestPathDialog(visiteShortestPath,Graph.getShortestPathLength(),2);
             commonUI.createInformationAlert("提示", null, "遍历全图最短路径查找成功！").showAndWait();
         }else{
             commonUI.createWarningAlert("提示", null, "编号不合法！").showAndWait();
@@ -280,8 +281,9 @@ public class MapUI {
     private void ShortRegressHandle(String beginNumber){
         if(checkNumber(beginNumber)){
             // TODO: 得到合法起始编号，调用最短路径算法计算最短回归得到最短路径
-            // List<Edge> backPath = Graph.greedyTSPBack(beginNumber);
-            // drawShortestBackPath(backPath);
+            List<Edge> backPath = Graph.findMiniBackSourcePath(beginNumber);
+            drawShortestBackPath(backPath);
+            commonUI.showShortestPathDialog(backPath,Graph.getShortestPathLength(),3);
             commonUI.createInformationAlert("提示", null, "最短路径查找成功！").showAndWait();
         }else{
             commonUI.createWarningAlert("提示", null, "编号包含非法字符！").showAndWait();

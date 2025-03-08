@@ -61,8 +61,8 @@ public class CommonUI {
         return confirmationAlert;
     }
 
-    // 显示最短路径弹窗
-    public void showShortestPathDialog(List<Edge> path,int length){
+    // 显示最短路径弹窗--多源最短路径
+    public void showShortestPathDialog(List<Edge> path,int length,int task){
         // 初始化弹窗
         Dialog<Void> dialog = new Dialog<>();
         dialog.setTitle("详细信息");
@@ -80,7 +80,8 @@ public class CommonUI {
         Label lengthLabel = new Label("路径长度："+length);
         lengthLabel.setStyle("-fx-font-size: 14px;");
 
-        VBox vBox = new VBox(10,pathLabel,lengthLabel);
+        VBox vBox = new VBox(10,pathLabel);
+        if(task==1)vBox.getChildren().add(lengthLabel);
 
         vBox.setStyle("-fx-padding: 20; -fx-alignment: center;");
         dialog.getDialogPane().setContent(vBox);

@@ -4,6 +4,8 @@ package com.wendisx.model;
  */
 import java.util.*;
 
+import org.apache.poi.hpsf.Array;
+
 import com.wendisx.util.DataIO;
 
 public class Graph {
@@ -62,36 +64,6 @@ public class Graph {
     private static void addEdge(String beginNumber,String endNumber,long weight){
         graph.computeIfAbsent(beginNumber, k -> new ArrayList<>());
         graph.get(beginNumber).add(new Edge(beginNumber,endNumber, weight));
-    }
-
-    // 构建内部并查集
-    private static class UnionFind {
-        // 代表节点
-        private Map<String,String> parent;
-        // 构造函数
-        public UnionFind(Collection<String> nodes){
-            parent = new HashMap<>();
-            for(String node:nodes){
-                // 初始时添加自身为代表节点
-                parent.put(node, node);
-            }
-        }
-        // 路径压缩
-        public String find(String node){
-            if(!parent.get(node).equals(node)){
-                parent.put(node, find(parent.get(node)));
-            }
-            return parent.get(node);
-        }
-        // 合并集合
-        public void union(String u,String v){
-            String uroot = find(u);
-            String vroot = find(v);
-            if(!uroot.equals(vroot)){
-                // 不在一个集合下，合并集合
-                parent.put(uroot, vroot);
-            }
-        }
     }
 
     // 使用村庄和道路数据构建图
@@ -186,7 +158,7 @@ public class Graph {
     }
 
     // 识别所有连通分量
-    public static List<List<String>> findConnectedColletion(){
+    public static List<List<String>> findConnectedCollection(){
         Set<String> visited = new HashSet<>();
         List<List<String>> components = new ArrayList<>();
 
@@ -195,6 +167,14 @@ public class Graph {
                 List<String> component = new ArrayList<>();
                 DFS(node,visited,component);
                 components.add(component);
+            }
+        }
+
+        // 处理孤立节点
+        for(String node:graph.keySet()){
+            if(!visited.contains(node)){
+                components.add(Collections.singletonList(node));
+                visited.add(node);
             }
         }
 
@@ -216,11 +196,28 @@ public class Graph {
     // 获取最小连通方案
     public static List<Edge> getMiniConnectedEdges(){
         List<Edge> result = new ArrayList<>();
-        List<List<String>> components = findConnectedColletion();
-        for(int i=0;i<components.size();i++){
-            for(int j=i+1;j<components.size();j++){
-                List<String> comp1 = components.get(i);
-                List<String> comp2 = components.get(j);
+        List<List<String>> components = findConnectedCollection();
+
+        // 处理孤立节点和普通连通分量
+        List<String> isolatedNodes = new ArrayList<>();
+        List<List<String>> normalNodes = new ArrayList<>();
+
+        // 记录孤立节点
+        for(List<String> node:components){
+            if(node.size()==1 && graph.get(node.get(0)).isEmpty()){
+                // 孤立节点
+                isolatedNodes.add(node.get(0));
+            }else{
+                // 普通节点
+                normalNodes.add(node);
+            }
+
+        }
+        // 处理普通节点
+        for(int i=0;i<normalNodes.size();i++){
+            for(int j=i+1;j<normalNodes.size();j++){
+                List<String> comp1 = normalNodes.get(i);
+                List<String> comp2 = normalNodes.get(j);
 
                 long minWeight = Long.MAX_VALUE;
                 Edge minEdge = null;
@@ -247,39 +244,34 @@ public class Graph {
                 }
             }
         }
+        // 处理孤立节点
+        for(String isolated:isolatedNodes){
+            long minWeight = Long.MAX_VALUE;
+            Edge bestEdge = null;
+
+            for(List<String> norList:normalNodes){
+                for(String norNode:norList){
+                    long weight = getWeight(isolated, norNode);
+                    if(weight<minWeight){
+                        minWeight=weight;
+                        bestEdge = new Edge(isolated, norNode, weight);
+                    }
+                }
+            }
+            if(bestEdge!=null){
+                result.add(bestEdge);
+                    // 当前图不连通时新增道路
+                    if(!IsConnected){
+                        // 新增道路
+                        roadsList.add(new Road((long)roadsList.size(),bestEdge.begin,bestEdge.end));
+                        // 记录条数
+                        addRoadCount++;
+                    }
+            }
+        }
+
         //System.out.println("addCount:"+addRoadCount);
         IsConnected = true;
-        return result;
-    }
-
-    // kruskal算法计算MST
-    public static List<Edge> kruskal(){
-        List<Edge> result = new ArrayList<>();
-        List<Edge> allEdges = new ArrayList<>();
-
-        // 所有边放入列表等待操作
-        for(Map.Entry<String,List<Edge>> entry:graph.entrySet()){
-            allEdges.addAll(entry.getValue());
-        }
-
-        // 排序所有边
-        Collections.sort(allEdges);
-
-        // 初始化并查集
-        UnionFind uf = new UnionFind(graph.keySet());
-        // 遍历所有边，按权值升序加入MST
-        for(Edge edge: allEdges){
-            String u = edge.begin;
-            String v = edge.end;
-
-            // 检查是否成环
-            if(uf.find(u).equals(uf.find(v))){
-                continue;
-            }
-            // 合并加边将其加入结果
-            uf.union(u, v);
-            result.add(edge);
-        }
         return result;
     }
 
@@ -331,115 +323,97 @@ public class Graph {
     }
 
     /**
-     *  遍历全图最短路径
+     * 遍历全图最短路径
+     * 使用MST+DFS近似最优求解
      */
-    
-    // 计算所有点度数
-    private static Map<String,Integer> getDegrees(){
-        Map<String,Integer> degree = new HashMap<>();
 
-        for(String node:graph.keySet()){
-            degree.put(node, graph.get(node).size());
+     // 并查集查方法
+     private static String find(String node,Map<String,String> parent){
+        if(!parent.get(node).equals(node)){
+            parent.put(node,find(parent.get(node), parent));
         }
-        return degree;
+        return parent.get(node);
+     }
+
+     // 并查集合并
+     private static boolean union(String begin,String end,Map<String,String> parent){
+        String beginp = find(begin, parent);
+        String endp = find(end, parent);
+
+        if(!beginp.equals(endp)){
+            parent.put(beginp,endp);
+            return true;
+        }
+        return false;
+     }
+    // 构建MST使用kruskal算法
+
+    private static List<Edge> buildMST(){
+        List<Edge> edges = new ArrayList<>();
+        for(List<Edge> edgeList:graph.values()){
+            edges.addAll(edgeList);
+        }
+        Collections.sort(edges);
+        Map<String,String> parent = new HashMap<>();
+        for(String node:graph.keySet()){
+            parent.put(node,node);
+        }
+        List<Edge> mstEdges = new ArrayList<>();
+        for(Edge edge:edges){
+            if(union(edge.getBegin(), edge.getEnd(), parent)){
+                mstEdges.add(edge);
+            }
+        }
+        return mstEdges;
     }
 
-    // Dijkstra计算所有对点最短路径
-    private static Map<String,Integer> Dijkstra(String start){
-        Map<String,Integer> dist = new HashMap<>();
-        PriorityQueue<Edge> pq = new PriorityQueue<>(Comparator.comparingInt(e -> (int)e.weight));
-        pq.add(new Edge(start, start, 0));
+    // DFS遍历MST找到最短路径
+    private static List<Edge> dfsMSTpath(List<Edge> mstEdges,String start){
+        Map<String,List<Edge>> mstGraph = new HashMap<>();
         
-        while (!pq.isEmpty()) {
-            Edge cur = pq.poll();
-            if(dist.containsKey(cur.end))continue;
-            dist.put(cur.end, (int)cur.weight);
-
-            for(Edge next:graph.getOrDefault(cur.end, new ArrayList<>())){
-                if(!dist.containsKey(next.end)){
-                    pq.add(new Edge(next.end, next.end, cur.weight+next.weight));
-                }
-            }
+        for(Edge edge:mstEdges){
+            mstGraph.computeIfAbsent(edge.getBegin(), k-> new ArrayList<>()).add(edge);
+            mstGraph.computeIfAbsent(edge.end, k-> new ArrayList<>()).add(new Edge(edge.getEnd(), edge.getBegin(),edge.weight));
         }
-        return dist;
+        
+        List<Edge> pathEdges = new ArrayList<>();
+        Set<String> visited = new HashSet<>();
+
+        dfs(start, visited, mstGraph, pathEdges);
+        return pathEdges;
+
     }
 
-    // 获取所有点对之间的最短路径
-    private static Map<String,Map<String,Integer>> getAllPairsShortPath(){
-        Map<String,Map<String,Integer>> shortPath = new HashMap<>();
-        for(String node:graph.keySet()){
-            shortPath.put(node, Dijkstra(node));
-        }
-        return shortPath;
-    }
-
-    // 找到度数为奇数的点
-    private static List<String> getOddDegreesNodes(){
-        List<String> oddNodes = new ArrayList<>();
-        Map<String,Integer> degree = getDegrees();
-        for(String node:degree.keySet()){
-            if(degree.get(node)%2!=0){
-                oddNodes.add(node);
+    // dfs遍历
+    private static void dfs(String start, Set<String> visited, Map<String, List<Edge>> mstGraph, List<Edge> pathEdges) {
+        visited.add(start);
+        for (Edge edge : mstGraph.getOrDefault(start, Collections.emptyList())) {
+            if (!visited.contains(edge.end)) {
+                pathEdges.add(edge);
+                dfs(edge.end, visited, mstGraph, pathEdges);
             }
-        }
-        return oddNodes;
-    }
-
-    // 最小权匹配，变为欧拉图
-    private static void makeEulerGraph(Map<String,Map<String,Integer>> shortPath){
-        List<String> oddNodes = getOddDegreesNodes();
-        while (!oddNodes.isEmpty()) {
-            String node1 = oddNodes.remove(0);
-            String bestMatch = null;
-            int minDist = Integer.MAX_VALUE;
-
-            for(String node2:oddNodes){
-                int dist = shortPath.get(node1).get(node2);
-                if(dist<minDist){
-                    minDist = dist;
-                    bestMatch = node2;
-                }
-            }
-             // 连接最佳匹配点
-        graph.get(node1).add(new Edge(node1, bestMatch, minDist));
-        graph.get(bestMatch).add(new Edge(bestMatch, node1, minDist));
-        oddNodes.remove(bestMatch);
         }
     }
 
-    // Hierholzer 算法求欧拉路径
-    private static List<Edge> findEulerPath(String start){
-        Stack<String> stack = new Stack<>();
-        List<Edge> path = new ArrayList<>();
-        Map<String,List<Edge>> tmpGraph = new HashMap<>();
-
-        for(String key:graph.keySet()){
-            tmpGraph.put(key, new ArrayList<>(graph.get(key)));
-        }
-
-        stack.push(start);
-        while (!stack.isEmpty()) {
-            String u = stack.peek();
-            if(!tmpGraph.get(u).isEmpty()){
-                Edge e = tmpGraph.get(u).remove(0);
-                tmpGraph.get(e.end).removeIf(edge -> edge.end.equals(u));
-                stack.push(e.end);
-            }
-            else{
-                stack.pop();
-                if(!stack.isEmpty()){
-                    path.add(new Edge(stack.peek(), u, 0));
-                }
-            }
-        }
-        return path;
+    // 最短遍历全图路径
+    public static List<Edge> findMiniVisiteAllNodePath(String start){
+        List<Edge> mstEdges = buildMST();
+        return dfsMSTpath(mstEdges, start);
     }
 
-    // 遍历所有点的最短路径
-    public static List<Edge> findShortestTravelPath(String start){
-        Map<String,Map<String,Integer>> shortPath = getAllPairsShortPath();
-        makeEulerGraph(shortPath);
-        return findEulerPath(start);
+    // 最短回溯路径
+    public static List<Edge> findMiniBackSourcePath(String start){
+        List<Edge> tspPath = findMiniVisiteAllNodePath(start);
+        if(tspPath.isEmpty()){
+            return tspPath;
+        }
+
+        // 找到回归路径
+        String last = tspPath.get(tspPath.size()-1).getEnd();
+        List<Edge> returnPath  = dijkstra(last,start);
+        // 合并回归路径
+        tspPath.addAll(returnPath);
+        return tspPath;
     }
 
 }
